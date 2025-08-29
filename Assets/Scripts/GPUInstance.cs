@@ -1,59 +1,65 @@
 using UnityEngine;
-
-//[ExecuteAlways]
+ 
+[RequireComponent((typeof(MeshRenderer)))]
+[ExecuteAlways]
 public class GPUInstance : MonoBehaviour
 {
-    public GameObject instanceGoal;
-    private Mesh _mesh;
-    private Material _material;
-
-    public int instanceCount = 5; //GPU实例化的个数
-    private Matrix4x4[] _matrices; //储存物体的TRS矩阵
-    private MaterialPropertyBlock _propBlock;
-    private float[] _thresholdArray;
-
-    private void Awake()
-    {
-        _thresholdArray = new float[instanceCount];
-        _propBlock = new MaterialPropertyBlock();
-        _mesh = instanceGoal.GetComponent<MeshFilter>().sharedMesh;
-        _material = instanceGoal.GetComponent<MeshRenderer>().sharedMaterial;
-    }
-
+    Mesh mesh; 
+    Material material;
+    [Header("壳层数")]public int shellCount = 100;
+ 
+    private Matrix4x4[] matrices;
+    //使用DrawInstanced()，为了正确合批，使用统一的MPB，一次绘制所有实例
+    private MaterialPropertyBlock props;
+    
+    private ComputeBuffer shellIndexBuffer;
+    float[] shellIndices;
     void Start()
     {
-        _matrices = new Matrix4x4[instanceCount]; //初始化矩阵数组
-        float scaleDelta = 1;
-        for (int i = 0; i < instanceCount; i++)
+        material = GetComponent<MeshRenderer>().sharedMaterial;
+        mesh = GetComponent<MeshFilter>().sharedMesh;
+ 
+        if (!material.enableInstancing)
         {
-            Vector3 position = new Vector3(0, 0, 0);
-            Quaternion rotation = Quaternion.identity;
-            Vector3 scale = Vector3.one * scaleDelta;
-            _matrices[i] = Matrix4x4.TRS(position, rotation, scale);
-            scaleDelta += 0.01f;
-            _thresholdArray[i] = i * 0.1f;
-            
-            if (_thresholdArray[i] > 1)
-            {
-                _thresholdArray[i] = 1;
-            }
+            Debug.LogWarning("Fur material must enable GPU Instancing");
         }
-
-        _propBlock.SetFloatArray("threshold", _thresholdArray);
+ 
+        // 所有实例使用同一个 props，用数组传 ShellIndex
+        matrices = new Matrix4x4[shellCount];
+            
+        props = new MaterialPropertyBlock();
+        
+        shellIndices = new float[shellCount];
+        for (int i = 0; i < shellCount; i++)
+        {
+            matrices[i] = transform.localToWorldMatrix;
+            shellIndices[i] = i;
+        }
+        
+        shellIndexBuffer = new ComputeBuffer(shellCount, sizeof(float));
+        shellIndexBuffer.SetData(shellIndices);
+ 
+        material.SetBuffer("_ShellIndexBuffer", shellIndexBuffer);
     }
-
+ 
     void Update()
     {
-        //一次性画一批，最多1023个
+        // 实例位置更新
+        for (int i = 0; i < shellCount; i++)
+        {
+            matrices[i] = transform.localToWorldMatrix;
+        }
+ 
+        // 使用真正的 GPU Instancing 调用
         Graphics.DrawMeshInstanced(
-            _mesh,
+            mesh,
             0,
-            _material,
-            _matrices,
-            _matrices.Length,
-            _propBlock,
-            UnityEngine.Rendering.ShadowCastingMode.On,
-            true
+            material,
+            matrices,
+            shellCount,
+            props,
+            UnityEngine.Rendering.ShadowCastingMode.Off,
+            false
         );
     }
 }
