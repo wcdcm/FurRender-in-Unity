@@ -13,6 +13,7 @@ public class GPUInstance : MonoBehaviour
     private MaterialPropertyBlock props;
     
     private ComputeBuffer shellIndexBuffer;
+    
     float[] shellIndices;
     void Start()
     {
