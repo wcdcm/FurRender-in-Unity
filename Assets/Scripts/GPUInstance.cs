@@ -6,7 +6,7 @@ public class GPUInstance : MonoBehaviour
 {
     Mesh mesh; 
     Material material;
-    [Header("壳层数")]public int shellCount = 100;
+    [Header("壳层数")][Range(0,100)]public int shellCount = 100;
  
     private Matrix4x4[] matrices;
     //使用DrawInstanced()，为了正确合批，使用统一的MPB，一次绘制所有实例

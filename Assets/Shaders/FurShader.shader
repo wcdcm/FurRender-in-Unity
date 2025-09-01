@@ -72,13 +72,13 @@ Shader "MyCustom/FurShader"
                 v2f o;
                 float3 worldPos = TransformObjectToWorld(v.vertex.xyz);
                 float3 worldNormal = TransformObjectToWorldNormal(v.normal);
-                worldPos += worldPos * worldNormal * (1 + shellFrac) * _FurLength;
+                worldPos += normalize(worldNormal) * shellFrac * _FurLength;
                 
-                o.pos = mul(UNITY_MATRIX_VP,worldPos);
+                o.pos = mul(UNITY_MATRIX_VP,float4(worldPos,1));
                 o.mainTexUV = TRANSFORM_TEX(v.uv, _MainTex);
                 o.maskUV = TRANSFORM_TEX(v.uv,_FurTex);
-                //o.maskNormal.xyz = v.normal;
-                o.maskNormal.w = shellFrac;
+                o.maskNormal.xyz = worldNormal;
+                o.maskNormal.w = shellFrac;//用w分量储存shellFrac
                 return o;
             }
 
@@ -86,9 +86,10 @@ Shader "MyCustom/FurShader"
             {
                 float4 col = tex2D(_MainTex, i.mainTexUV);
                 float mask = tex2D(_FurTex,i.maskUV).r;
-
+                float shellFrac = i.maskNormal.w;
                 //mask = saturate(smoothstep(i.maskNormal.w,1,mask));
-                
+                //mask = saturate(step(i.maskNormal.w,mask));
+                mask = smoothstep(shellFrac, shellFrac + 0.05, mask);
                 col.a = mask;
                 return col;
             }
