@@ -111,7 +111,6 @@ Shader "MyCustom/FurShader"
                 mask = smoothstep(shellFrac, shellFrac + 0.05, mask);
                 col.a = mask;
                 clip(col.a - 0.5);//丢弃Alpha小于0.5的部分
-                
                 return col;
             }
             ENDHLSL
