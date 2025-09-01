@@ -5,11 +5,12 @@ Shader "MyCustom/FurShader"
         _MainTex ("Texture", 2D) = "white" {}
         _NormalTex("Normal",2D) = "bump"{}
         _FurTex("Mask",2D)="white"{}
-        _FurTilling("毛发密度",Range(0.5,2)) = 1
         _ShellCount("Shell层数",Range(0,100)) = 50
         _FurLength("毛发长度",Range(1,50)) = 1
         fresnelPower("边缘光强度",Range(0,10)) = 1
         [HDR]edgeColor("边缘光颜色",Color) = (1,1,1,1)
+        specularIntensity("高光强度",Float) = 1
+        specularRange("高光范围",Float) = 1
     }
     SubShader
     {
@@ -46,10 +47,11 @@ Shader "MyCustom/FurShader"
             sampler2D _NormalTex;
             float4 _NormalTex_ST;
             
-            float _FurTilling;
             float _FurLength;
             float fresnelPower;
             float3 edgeColor;
+            float specularIntensity;
+            float specularRange;    
             
             StructuredBuffer<float> _ShellIndexBuffer;
             float _ShellCount;
@@ -94,17 +96,36 @@ Shader "MyCustom/FurShader"
             {
                 float4 col = tex2D(_MainTex, i.mainTexUV);
                 float mask = tex2D(_FurTex,i.maskUV).r;
-                //边缘光计算
+
+                //计算边缘光Fresnel
                 float3 N = normalize(i.maskNormal.xyz);//获取片元的世界法线方向
                 float3 V = normalize(_WorldSpaceCameraPos.xyz - i.worldPos);//获取片元到摄像机的方向向量
                 float fresnel = pow(1 - saturate(max(0,dot(N,V))),fresnelPower);
                 col.rgb = lerp(col.rgb,edgeColor,fresnel);
-
+                
                 //Lambert光照计算
                 Light mainLight = GetMainLight();
                 float3 L = normalize(mainLight.direction.xyz);//获取光源方向
                 float NdotL = max(0.1,dot(N,L));
-                col.rgb *= NdotL * mainLight.color * mainLight.distanceAttenuation;//mainLight.color 包含了光源强度
+                float3 baseColor = col.rgb * NdotL * mainLight.color * mainLight.distanceAttenuation;
+                
+                
+                //各向异性计算
+                float3 T = normalize(cross(N,float3(0,1,0)));//构造毛发局部切线分量
+                if (length(T)<0.001) T = float3(1,0,0);
+                float3 H = normalize(L + V);//获取半角分量
+                float NdotH = max(0,dot(N,H));
+                float TdotH = dot(T,H);
+                float anisotropy = pow(NdotH,1) * pow(saturate(TdotH),8);
+                col.rgb = lerp(col.rgb,edgeColor,anisotropy);
+
+                //高光计算
+                NdotH = saturate(dot(N,H));
+                float spec = pow(NdotH,specularRange) * specularIntensity;
+                float specular = spec * col.rgb;
+
+                col.rgb = baseColor + specular;
+                //col.rgb = baseColor;
                 
                 //剔除计算
                 float shellFrac = i.maskNormal.w;
