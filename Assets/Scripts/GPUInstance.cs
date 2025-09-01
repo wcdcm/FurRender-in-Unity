@@ -26,8 +26,9 @@ public class GPUInstance : MonoBehaviour
         }
  
         // 所有实例使用同一个 props，用数组传 ShellIndex
-        matrices = new Matrix4x4[shellCount];
-            
+        matrices = new Matrix4x4[100];
+        
+        
         props = new MaterialPropertyBlock();
         
         shellIndices = new float[shellCount];
