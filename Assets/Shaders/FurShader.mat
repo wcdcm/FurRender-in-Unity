@@ -59,11 +59,11 @@ Material:
     - fresnelPower: 4.62
     - shinness: 1
     - spec_intensity: 1
-    - specularIntensity: 4.3
+    - specularIntensity: 0.26
     - specularRange: 14.8
     m_Colors:
     - _FresnelColor: {r: 1, g: 1, b: 1, a: 1}
     - _FurColor: {r: 1, g: 1, b: 1, a: 1}
     - _RootColor: {r: 0.46226418, g: 0.46226418, b: 0.46226418, a: 1}
-    - edgeColor: {r: 1.4980392, g: 1.4980392, b: 1.4980392, a: 1}
+    - edgeColor: {r: 0.1872549, g: 0.1872549, b: 0.1872549, a: 1}
   m_BuildTextureStacks: []
