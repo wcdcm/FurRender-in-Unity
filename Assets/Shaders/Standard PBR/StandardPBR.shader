@@ -88,7 +88,7 @@ Shader "MyCustom/StandardPBR"
                 float a = roughness * roughness;
                 float a2 = a * a;
                 float denom = (NdotH * NdotH) * (a2 - 1.0) + 1.0;
-                return a2 / (PI * denom * denom + 1e-6);
+                return a2 / (PI * denom * denom + 0.001);
             }
             //几何遮蔽函数G（N，L，V)
             float GeometrySchlickGGX(float NdotV, float roughness)
@@ -103,7 +103,7 @@ Shader "MyCustom/StandardPBR"
             }
 
             //直射光
-            float3 BRDF_Direct(float3 N,float3 V,float3 L,Light light,float3 albedo,float metallic,float roughness)
+            float3 BRDF_Direct(float3 N,float3 V,float3 L,Light mainLight,float3 albedo,float metallic,float roughness)
             {
                 float3 H = normalize(dot(L,V));
 
@@ -120,17 +120,17 @@ Shader "MyCustom/StandardPBR"
                 float D = DistributionGGX(NdotH,roughness);//计算微表面法线分布函数
                 float G = GeometrySmith(NdotV,NdotL,roughness);//计算几何遮蔽函数
 
-                float3 specular = (D * F * G)/(4 * NdotV * NdotL + 1e-6);
+                float3 specular = (D * F * G)/(4 * NdotV * NdotL + 0.001);
 
                 // kD = 漫反射能量 (金属越高漫反射越低)
                 float3 kS = F;
                 float3 kD = (1.0 - kS) * (1.0 - metallic);
                 float3 diffuse = kD * albedo / PI;
                 
-                diffuse = albedo * NdotL * light.color * light.distanceAttenuation;
-                diffuse = lerp(albedo,0.01,metallic);
+                diffuse = albedo * NdotL * mainLight.color * mainLight.distanceAttenuation;
+                diffuse = lerp(diffuse,0.01,metallic);
                     
-                return diffuse + specular * light.color * light.distanceAttenuation;
+                return diffuse + specular * mainLight.color * mainLight.distanceAttenuation;
             }
             
             half4 frag (v2f i) : SV_Target
