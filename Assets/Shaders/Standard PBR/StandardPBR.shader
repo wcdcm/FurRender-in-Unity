@@ -6,7 +6,7 @@ Shader "MyCustom/StandardPBR"
         NormalMap("NormalMap",2D) = "bump"{}
         NormalStrength("NormalStrength",Range(1,10)) = 1
         MetalMap("MetalMap",2D) = "white"{}
-        Smoothness("Smoothness",Range(0,0.8)) = 0.5
+        Smoothness("Smoothness",Range(0,1)) = 0.5
         
         OcclusionMap("OcclusionMap",2D) = "white"{}
     }
@@ -29,19 +29,18 @@ Shader "MyCustom/StandardPBR"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             
-            
             struct appdata
             {
-                float4 vertex : POSITION;
+                float4 vertex : POSITION;//顶点是齐次坐标的形式，所以是四个分量
                 float3 normal : NORMAL;
-                float4 tangent : TANGENT;
+                float4 tangent : TANGENT;//第四个分量储存的是切线的方向
                 float2 mainUV : TEXCOORD0;
                 float2 normalUV : TEXCOORD1;
             };
 
             struct v2f
             {
-                float4 pos : SV_POSITION;
+                float4 pos : SV_POSITION;//pos是经过裁剪空间处理过后的顶点齐次坐标（必须要写）
                 float2 mainUV : TEXCOORD0;
                 float2 normalUV : TEXCOORD1;
                 float3x3 TBN : TEXCOORD2;//传递TBN矩阵给片元着色器，用于将计算法线的世界空间坐标。float3X3这里会占用 TEXCOORD2, TEXCOORD3, TEXCOORD4三个寄存器
@@ -79,9 +78,9 @@ Shader "MyCustom/StandardPBR"
 
             //===============BRDF工具函数===============
             //菲涅尔项 F(V，h）
-            float3 FresnelSchlik(float HdotV,float3 F0)
+            float3 FresnelSchlik(float costheta,float3 F0)
             {
-                return F0 + (1 - F0) * pow(1-HdotV,5);
+                return F0 + (1 - F0) * pow(1-costheta,5);
             }
             //适用于金属的微表面分布函数D(h)
             float DistributionGGX(float NdotH,float roughness)
@@ -128,17 +127,38 @@ Shader "MyCustom/StandardPBR"
                 float3 kD = (1.0 - kS) * (1.0 - metallic);
                 float3 diffuse = kD * albedo / PI;
 
-                //兰伯特模型计算diffuse的写法：
+                /*兰伯特模型计算diffuse的写法：
                 //diffuse = albedo * NdotL * mainLight.color * mainLight.distanceAttenuation;
                 //diffuse = lerp(diffuse,0.01,metallic);
                 //return diffuse + specular * mainLight.color * mainLight.distanceAttenuation;
+                */
                 return (diffuse + specular) * mainLight.color * mainLight.distanceAttenuation * NdotL;
             }
 
-            //==============环境光=====================
-            float3 BRDF_IBL()
+            //==============IBL环境光=====================
+            float3 BRDF_IBL(float3 N,float3 V,float3 albedo,float metallic,float roughness)
             {
+                //基础反射率
+                float3 F0 = lerp(float3(0.04,0.04,0.04),albedo,metallic);
                 
+                //环境漫反射（球谐函数SH）
+                float3 disfuseIBL = SampleSH(N);
+                
+                //环境高光 （反射探针）
+                float3 R = reflect(-V,N);
+                float3 specIBL = SAMPLE_TEXTURECUBE(unity_SpecCube0,samplerunity_SpecCube0,R).rgb;//URP 的 IBL 高光采样永远采 unity_SpecCube0，而不是实时采样场景里的 Skybox。如果想让自定义天空盒参与 IBL，需要让它先生成 cubemap（Reflection Probe 烘焙或实时更新）。
+
+                //Fresnel
+                float NdotV = saturate(dot(N,V));
+                float3 F = FresnelSchlik(NdotV,F0);
+
+                //KD 漫反射能量
+                float3 KS = F;
+                float3 KD = (1.0 - F) * (1.0 - metallic);
+                float3 diffuse = KD * albedo * disfuseIBL;
+                float3 specular = specIBL * (F * roughness);
+                
+                return diffuse + specular;
             }
             
             half4 frag (v2f i) : SV_Target
@@ -163,8 +183,10 @@ Shader "MyCustom/StandardPBR"
                 half roughness = 1 - smoothness;
                 
                 float3 directLighting = BRDF_Direct(N,V,L,mainLight,albedo,metallic,roughness);
+                float3 inDirectLighting = BRDF_IBL(N,V,albedo,metallic,roughness);
                 
-                col.rgb = directLighting;
+                col.rgb = directLighting + inDirectLighting;
+                //col.rgb = directLighting;
                
                 return col;
             }
