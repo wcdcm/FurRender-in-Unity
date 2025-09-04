@@ -9,7 +9,7 @@ Shader "Custom/URP_TianKongHe"
         Tags
         {
             "RenderPipeline"="UniversalRenderPipeline"
-            "RenderType"="Skybox"
+            "RenderType"="Background"
             "IgnoreProjector"="True"
             "Queue"="Background"
         }

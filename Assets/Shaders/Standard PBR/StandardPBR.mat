@@ -50,7 +50,7 @@ Material:
     m_Ints: []
     m_Floats:
     - Metallic: 0
-    - NormalStrength: 1
+    - NormalStrength: 2.01
     - Smoothness: 0.74
     m_Colors: []
   m_BuildTextureStacks: []
