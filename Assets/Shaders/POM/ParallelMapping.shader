@@ -110,7 +110,7 @@ Shader "Unlit/Parallax"
 
                 float stepSize = 1 / maxLayers;
                 float layerHeight = stepSize;
-                float2 uvDelta  = _ParallaxIntensity * viewDir.xy / viewDir.z  * stepSize;
+                float2 uvDelta  = _ParallaxIntensity * viewDir.xy / viewDir.z * stepSize;
 
                 float2 uvOffset = 0;
                 float2 currentUV = uv;
