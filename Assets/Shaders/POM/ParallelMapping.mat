@@ -11,7 +11,9 @@ Material:
   m_Shader: {fileID: 4800000, guid: cade26419ec4b7145ae7f42c08f128f0, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - JITTER
+  - Parallax
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -35,8 +37,30 @@ Material:
         m_Texture: {fileID: 2800000, guid: 1ef00673c40ad8e41a4482bf6690e57e, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _DetailTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _HeightTex:
+        m_Texture: {fileID: 2800000, guid: 3a9de7e1acf492047af9a7f023b3c7f0, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 2800000, guid: ea605f269919c554bb9993342d5264bc, type: 3}
+        m_Scale: {x: 0.5, y: 0.5}
+        m_Offset: {x: 0, y: 0}
+    - _NormalTex:
+        m_Texture: {fileID: 2800000, guid: 1ef00673c40ad8e41a4482bf6690e57e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - Smoothness: 0.5
-    m_Colors: []
+    - _BumpScale: 2
+    - _Jitter: 1
+    - _Parallax: 1
+    - _ParallaxIntensity: 0.037
+    - _maxLayer: 10
+    m_Colors:
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 0}
   m_BuildTextureStacks: []

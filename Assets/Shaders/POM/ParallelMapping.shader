@@ -1,11 +1,17 @@
-Shader "Custom/ParallelMapping"
+Shader "Unlit/Parallax"
 {
     Properties
     {
-        MainTex ("Texture", 2D) = "white" {}
-        NormalMap("NormalMap",2D) = "bump"{}
-        HeightMap("HeightMap",2D) = "white"{}
-        Smoothness("Smoothness",Float) = 0.5
+        _MainTex ("Albedo", 2D) = "white" {}
+        _DetailTex ("Detail", 2D) = "white" {}
+        _NormalTex ("Normal", 2D) = "bump" {}
+        _HeightTex ("Height", 2D) = "white" {}
+        _ParallaxIntensity("ParallaxIntensity",Range(0.01 ,1)) = 0.1
+        _BumpScale("Bump Scale", Range(0,2)) = 0.2
+        [Toggle(JITTER)]_Jitter("Jitter",Float) = 0
+        [Toggle(Parallax)]_Parallax("Parallax",Float) = 0
+        _BaseColor("BaseColor", Color) = (1,1,1,0)
+        
     }
     SubShader
     {
@@ -17,56 +23,129 @@ Shader "Custom/ParallelMapping"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma shader_feature _ JITTER
+            #pragma shader_feature _ Parallax
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 
-            struct appdata
+            struct Varinfgs
             {
-                float4 vertex : POSITION;
+                float4 positionOS : POSITION;
                 float2 uv : TEXCOORD0;
-                float3 normal : NORMAL;//对象空间法线
-                float4 tangent : TANGENT;//对象空间切线
+                float4 tangent : TANGENT;
+                float3 normal : NORMAL; 
+            };
+            struct Output
+            {
+                float4 positionCS : SV_POSITION;
+                float4 uv : TEXCOORD0;
+                float3 viewDir : TEXCOORD1; //切线空间的视线方向
+                float3 tangentWS : TEXCOORD2;
+                float3 bitangentWS : TEXCOORD3;
+                float3 normalWS : TEXCOORD4;
             };
 
-            struct v2f
-            {
-                float4 pos : SV_POSITION;
-                float2 uv : TEXCOORD0;
-                float3x3 TBN : TEXCOORD1;//占TEXCOORD1，TEXCOORD2，TEXCOORD3
-            };
-
-            TEXTURE2D(MainTex);
+            TEXTURE2D(_MainTex);
+            TEXTURE2D(_DetailTex);
+            TEXTURE2D(_NormalTex);
+            TEXTURE2D(_HeightTex);
             SAMPLER(sampler_MainTex);
-            float4 MainTex_ST;
 
-            TEXTURE2D(NormalMap);
-            SAMPLER(sampler_NormalMap);
-            float4 NormalMap_ST;
+            float4 _MainTex_ST;
+            float4 _DetailTex_ST;
 
-            v2f vert (appdata v)
+            half _ParallaxIntensity;
+            half _BumpScale;
+            half4 _BaseColor;
+
+            Output vert (Varinfgs v)
             {
-                v2f o;
-                o.pos = TransformObjectToHClip(v.vertex);
-                o.uv = TRANSFORM_TEX(v.uv, MainTex);
-                float3 N = TransformObjectToWorldNormal(v.normal.xyz,true);
-                float3 T = TransformObjectToWorldDir(v.tangent,true);
-                float3 B = cross(N,T) * v.tangent.w;
-                o.TBN = float3x3(T,B,N);
+                Output o;
+                VertexPositionInputs vertexInput = GetVertexPositionInputs(v.positionOS.xyz);
+                o.positionCS = vertexInput.positionCS;
+                //[世界空间视线]转[切线空间视线]
+                float3x3 objectToTangent = float3x3(
+                    v.tangent.xyz, 
+                    cross(v.normal, v.tangent.xyz) * v.tangent.w,
+                    v.normal);
+                float3 positionWS = vertexInput.positionWS;
+                float3 cameraPositionWS = _WorldSpaceCameraPos;
+                //世界空间视线转模型空间
+                float3 viewDirWS = TransformWorldToObjectDir(positionWS - cameraPositionWS);
+                //模型空间转切线空间
+                o.viewDir = mul(objectToTangent, viewDirWS);
+                
+                //法线贴图解析数据
+                VertexNormalInputs normalInputs = GetVertexNormalInputs(v.normal.xyz,v.tangent);
+                o.normalWS = normalInputs.normalWS;
+                o.bitangentWS = normalInputs.bitangentWS;
+                o.tangentWS  = normalInputs.tangentWS;
+
+                o.uv.xy = TRANSFORM_TEX(v.uv, _MainTex);
+                o.uv.zw = TRANSFORM_TEX(v.uv, _DetailTex);
                 return o;
             }
-
-            float4 frag (v2f i) : SV_Target
+            //高度图采样
+            half GetParallaxHeight(float2 uv)
             {
-                float4 col = SAMPLE_TEXTURE2D(MainTex,sampler_MainTex,i.uv);
-                float3 normalTS = UnpackNormal(SAMPLE_TEXTURE2D(NormalMap,sampler_NormalMap,i.uv));//切线空间法线
-                float3 normalWS = normalize(mul(normalTS,i.TBN));//将切线空间转换为世界空间
-                float3 N = normalWS;
-                float3 L = GetMainLight().direction;
-                float NdotL = max(0.1,(dot(N,L)));
-                float3 diffuse = GetMainLight().color * GetMainLight().distanceAttenuation * NdotL;
-                col.rgb *= diffuse;
-                return col;
+                return SAMPLE_TEXTURE2D(_HeightTex, sampler_MainTex, uv).r;
+            }
+            //抖动的随机噪声
+            float RandomNoise(float2 uv) //这里使用 SV_POSITION 作为uv输入
+            {   
+                uv += 1 * float2(47.0, 17.0) * 0.695;
+                const float3 magic = float3(0.06711056, 0.00583715, 52.9829189);
+                return frac(magic.z * frac(dot(uv, magic.xy)));
+            }
+            //视差步进
+            float2 ParallaxRaymarching(float4 positionCS, float2 uv, float3 viewDir) 
+            {
+                float maxLayers = 20;
+                float noise = RandomNoise(positionCS.xy);
+                #ifdef JITTER
+                    maxLayers = maxLayers * 0.5 + maxLayers * noise;
+                #endif
+
+                float stepSize = 1 / maxLayers;
+                float layerHeight = stepSize;
+                float2 uvDelta  = _ParallaxIntensity * viewDir.xy / viewDir.z  * stepSize;
+
+                float2 uvOffset = 0;
+                float2 currentUV = uv;
+                float stepHeight  = 1.0;
+
+                float heightMap = GetParallaxHeight(currentUV);
+                for (int i = 1; i < maxLayers && stepHeight > heightMap; i++) //当i小于最大循环次数且当前高度值大于当前步进循环内采样的高度值时，循环继续
+                {
+                    uvOffset -= uvDelta;
+                    stepHeight -= layerHeight;
+                    heightMap = GetParallaxHeight(currentUV + uvOffset);
+                }
+                return uvOffset;
+            }
+            half4 frag (Output i) : SV_Target
+            {
+                float2 uvOffset = 0;
+
+                #ifdef Parallax
+                    uvOffset = ParallaxRaymarching(i.positionCS, i.uv.xy, normalize(i.viewDir));
+                #endif
+
+                float2 currentUV = i.uv.xy + uvOffset;
+
+                //简单的 NdotL 光照模型
+                Light light = GetMainLight();
+                float4 normalTex = SAMPLE_TEXTURE2D(_NormalTex, sampler_MainTex, currentUV);
+                float3 normalTS = UnpackNormalScale(normalTex,_BumpScale);
+                float3 normalWS = TransformTangentToWorld(normalTS, real3x3(i.tangentWS, i.bitangentWS, i.normalWS));
+                float power = saturate(dot(light.direction,normalWS)); 
+
+                half4 albedo = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, currentUV);
+                half4 details = SAMPLE_TEXTURE2D(_DetailTex, sampler_MainTex, i.uv.zw + uvOffset);
+
+                return albedo * power * _BaseColor ;//+ details;
             }
             ENDHLSL
         }
