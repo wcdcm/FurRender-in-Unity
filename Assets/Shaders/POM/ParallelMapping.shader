@@ -117,7 +117,7 @@ Shader "Unlit/Parallax"
                 float stepHeight  = 1.0;
 
                 float heightMap = GetParallaxHeight(currentUV);
-                for (int i = 1; i < maxLayers && stepHeight > heightMap; i++) //当i小于最大循环次数且当前高度值大于当前步进循环内采样的高度值时，循环继续
+                for (int i = 1; i < maxLayers && stepHeight > heightMap; i++) 
                 {
                     uvOffset -= uvDelta;
                     stepHeight -= layerHeight;
