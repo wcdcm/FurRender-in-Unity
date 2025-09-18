@@ -57,7 +57,7 @@ Shader "MyCustom/FurShader_AnisoSpec"
             StructuredBuffer<float> _ShellIndexBuffer;
             float _ShellCount;
 
-            struct appdata
+            struct Attributes
             {
                 float4 vertex : POSITION;
                 float3 vertexNormal : NORMAL;
@@ -65,7 +65,7 @@ Shader "MyCustom/FurShader_AnisoSpec"
                 uint id : SV_InstanceID;
             };
 
-            struct v2f
+            struct Varying
             {
                 float4 pos : SV_POSITION;
                 float3 worldPos : TEXCOORD3;
@@ -74,9 +74,9 @@ Shader "MyCustom/FurShader_AnisoSpec"
                 float4 maskNormal : TEXCOORD2; // xyz = normal, w = shellFrac
             };
 
-            v2f vert (appdata v)
+            Varying vert (Attributes v)
             {
-                v2f o;
+                Varying o;
                 float shellIndex = _ShellIndexBuffer[v.id];
                 float shellFrac = shellIndex/_ShellCount;
 
@@ -100,7 +100,7 @@ Shader "MyCustom/FurShader_AnisoSpec"
                 return l > 1e-6 ? v / l : float3(0,0,1);
             }
 
-            float4 frag (v2f i) : SV_Target
+            float4 frag (Varying i) : SV_Target
             {
                 float4 albedo = tex2D(_MainTex, i.mainTexUV);
                 float mask = tex2D(_FurTex, i.maskUV).r;
