@@ -30,7 +30,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _DepthFactor: 32.7
-    - _DepthMax: 0.21
+    - _DepthMax: 0
     - _DepthMin: 0
     - _DepthScale: 0.92
     m_Colors: []

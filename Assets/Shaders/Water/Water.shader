@@ -82,10 +82,10 @@ Shader "Custom/Water"
                 //对depth的数值进行重映射
                 //_depth = smoothstep(_DepthMin,_DepthMax,(_depth - _DepthMin)/(_DepthMax - _DepthMin));
 
-
+                
                 //获取水面深度 = 视图空间中物体的深度值 - 水面各片元在视图空间下的深度值
-                //因为unity的视图空间采用的是右手坐标系，所以z轴方向都是负值，所以_depth和i.posVS.z都是负值，
-                float waterDepth = _depth + i.posVS.z;
+                //因为unity的视图空间采用的是右手坐标系，所以z轴方向都是负值，所以_depth和i.posVS.z都是负值，如果要相减就把它们变为正值后再减
+                float waterDepth = abs(_depth) - abs(i.posVS.z);
                 
                 return waterDepth;
             }
