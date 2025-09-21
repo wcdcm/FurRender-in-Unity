@@ -2,9 +2,21 @@ Shader "Custom/Water"
 {
     Properties
     {
-        _MainTex ("Texture", 2D) = "white" {}
         _DepthMin("DepthMin",Range(0,1)) = 0
         _DepthMax("DepthMax",Range(0,1)) = 1
+        _WaterColorDeep("深水区颜色",Color) = (0,0.2,0.4,1)
+        _WaterColorShallow("浅水区颜色",Color) = (1,0.9,0.9,1)
+        
+        [Toggle]_UseFoam("使用泡沫",int) = 0
+        _FoamShape("泡沫形状",2D) = "white"{}
+        _FoamRange("泡沫范围",Range(0.01,5)) = 1
+        _FoamSmoothness("泡沫平滑度",Range(0.01,1)) = 1
+        _FoamStrength("泡沫亮度",Range(0.01,1)) = 1
+        _FoamDetails("泡沫细节",2D)="white"{}
+        
+        [Toggle]_UseRefract("使用折射",int) = 0
+        _RefractTex("水面折射贴图",2D)="white"{}
+        _RefractFactor("水面折射度",Float)=0.5
     }
     SubShader
     {
@@ -22,6 +34,7 @@ Shader "Custom/Water"
             {
                 "LightMode"="UniversalForward"
             }
+            Blend SrcAlpha OneMinusSrcAlpha
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
@@ -33,6 +46,8 @@ Shader "Custom/Water"
             {
                 float4 vertex : POSITION;
                 float2 uv : TEXCOORD0;
+                float2 detailUV : TEXCOORD2;
+                
             };
 
             struct v2f
@@ -40,13 +55,31 @@ Shader "Custom/Water"
                 float4 posCS : SV_POSITION;//投影（裁剪）空间顶点坐标
                 float3 posVS : TEXCOORD1;//视图空间顶点坐标
                 float2 uv : TEXCOORD0;
+                float2 detailUV : TEXCOORD2;
             };
-
-            sampler2D _MainTex;
-            float4 _MainTex_ST;
+            
             sampler2D _CameraDepthTexture;
             float _DepthMin;
             float _DepthMax;
+            float4 _WaterColorDeep;
+            float4 _WaterColorShallow;
+
+            //泡沫形状采样器
+            float _UseFoam;
+            sampler2D _FoamShape;
+            float4 _FoamShape_ST;
+
+            float _FoamRange;
+            float _FoamSmoothness;
+            float _FoamStrength;
+
+            //泡沫细节
+            sampler2D _FoamDetails;
+            float4 _FoamDetails_ST;
+
+            //折射
+            sampler2D _RefractTex;float4 _RefractTex_ST;
+            float _RefractFactor;
             
             v2f vert (appdata v)
             {
@@ -56,38 +89,47 @@ Shader "Custom/Water"
                 o.posCS = TransformObjectToHClip(v.vertex);
                 float3 posWS = TransformObjectToWorld(v.vertex);
                 o.posVS = TransformWorldToView(posWS);
-                o.uv = TRANSFORM_TEX(v.uv, _MainTex);
+                o.uv = TRANSFORM_TEX(v.uv, _FoamShape) + _Time.x;//计算泡沫贴图的UV并对它们进行偏移
+                o.detailUV = TRANSFORM_TEX(v.detailUV,_FoamDetails) + _Time.x * 0.8;//计算泡沫细节贴图的UV并对它们进行偏移
                 return o;
             }
 
             half4 frag (v2f i) : SV_Target
             {
                 float2 screenUV = i.posCS.xy/_ScreenParams.xy;
+
+                // float2 refractionUV = tex2D(_RefractTex,i.uv).xy;
+                // float2 originalUV = screenUV;
+                //
+                // screenUV = lerp(originalUV,refractionUV,_RefractFactor);
                 
                 //如果unity默认使用的是D3D的图形API，则会默认启用深度缓冲区的Reverse-Z的方式，所以片元深度值越小片元越白（接近于1），深度值越大片元越黑（接近于0）
                 //Reverse-Z主要是为了解决远端物体深度精度不足的问题
-                float _depth = tex2D(_CameraDepthTexture,screenUV.xy);//采样不透明物体的深度值，该深度值是在NDC空间进行计算的
+                //采样不透明物体的深度值，该深度值是在NDC空间进行计算的
+                float _depth = tex2D(_CameraDepthTexture,screenUV.xy);
 
-                // //不管是OpenGL还是D3D的API，都可以用Linear01Depth将非线性的深度值转换到0-1的线性范围内，并且不会做深度反转。屏蔽了不同图形API的差异性
-                // _depth = Linear01Depth(_depth,_ZBufferParams);
-                //
-                // //使用SmoothStep函数将深度值从接近1的一个小范围拉伸到0-1，使用SmoothStep将中间值的区分度拉高
-                // _depth = smoothstep(_DepthMin,_DepthMax,(_depth - _DepthMin)/(_DepthMax - _DepthMin));
-
-                _depth = LinearEyeDepth(_depth,_ZBufferParams);//将NDC空间的值转换到视图空间，便于深度判断
-                
-                //因为视图空间，远裁剪面和近裁剪面的距离过大，比如说0.3-1000.所以需要除以一个值，将它们缩放到0-1之间
-                //_depth/=20;
-
-                //对depth的数值进行重映射
-                //_depth = smoothstep(_DepthMin,_DepthMax,(_depth - _DepthMin)/(_DepthMax - _DepthMin));
-
+                //将NDC空间的值转换到视图空间，便于深度判断
+                _depth = LinearEyeDepth(_depth,_ZBufferParams);
                 
                 //获取水面深度 = 视图空间中物体的深度值 - 水面各片元在视图空间下的深度值
                 //因为unity的视图空间采用的是右手坐标系，所以z轴方向都是负值，所以_depth和i.posVS.z都是负值，如果要相减就把它们变为正值后再减
-                float waterDepth = abs(_depth) - abs(i.posVS.z);
-                
-                return waterDepth;
+                //深度为正，说明不透明物体在水面下;深度为负，说明不透明物体在水面上。
+
+                half waterDepth = saturate(abs(_depth) - abs(i.posVS.z));//计算得到水的深度
+                half4 waterCol = lerp(_WaterColorShallow,_WaterColorDeep,waterDepth);
+                float foam = 0;
+                if (_UseFoam)
+                {
+                    foam = tex2D(_FoamShape,i.uv);//采样泡沫贴图获取泡沫形状
+                    float foamDetails = tex2D(_FoamDetails,i.detailUV);//采样细节贴图
+                    foam *= foamDetails;//叠加细节
+                    float foamRange = _FoamRange * waterDepth;//计算出泡沫范围
+                    foam = pow(foam,_FoamSmoothness);
+                    foam = step(foamRange,foam);//根据泡沫抠出泡沫的
+                    foam *= _FoamStrength;
+                }
+                waterCol.a = 0.7;
+                return foam + waterCol;
             }
             ENDHLSL
         }

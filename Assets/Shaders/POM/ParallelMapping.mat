@@ -12,6 +12,7 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
+  - JITTER
   - Parallax
   m_InvalidKeywords: []
   m_LightmapFlags: 4
@@ -56,9 +57,9 @@ Material:
     m_Floats:
     - Smoothness: 0.5
     - _BumpScale: 2
-    - _Jitter: 0
+    - _Jitter: 1
     - _Parallax: 1
-    - _ParallaxIntensity: 0.124
+    - _ParallaxIntensity: 0.058
     - _maxLayer: 10
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 0}

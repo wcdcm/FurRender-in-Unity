@@ -17,13 +17,13 @@ Shader "Custom/MassiveBlackHole"
 
              #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            struct Attributes
+            struct appdata
             {
                 float4 vertex : POSITION;
                 float2 uv : TEXCOORD0;
             };
 
-            struct Varying
+            struct v2f
             {
                 float4 pos : SV_POSITION;
                 float2 uv : TEXCOORD0;
@@ -34,9 +34,9 @@ Shader "Custom/MassiveBlackHole"
             SAMPLER(sampler_MainTex);
             float4 MainTex_ST;
             
-            Varying vert (Attributes v)
+            v2f vert (appdata v)
             {
-                Varying o;
+                v2f o;
                 o.pos = TransformObjectToHClip(v.vertex.xyz);
                 o.posWS = TransformObjectToWorld(v.vertex.xyz);
                 o.uv = TRANSFORM_TEX(v.uv, MainTex);
@@ -45,7 +45,7 @@ Shader "Custom/MassiveBlackHole"
 
             //float2 intersectSphere
             
-            float4 frag (Varying i) : SV_Target
+            float4 frag (v2f i) : SV_Target
             {
                 float4 col = SAMPLE_TEXTURE2D(MainTex,sampler_MainTex,i.uv);
                 float3 rayDir = normalize(i.posWS - _WorldSpaceCameraPos);

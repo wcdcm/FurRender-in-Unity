@@ -29,7 +29,7 @@ Shader "MyCustom/StandardPBR"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             
-            struct Attributes
+            struct appdata
             {
                 float4 vertex : POSITION;//顶点是齐次坐标的形式，所以是四个分量
                 float3 normal : NORMAL;
@@ -38,7 +38,7 @@ Shader "MyCustom/StandardPBR"
                 float2 normalUV : TEXCOORD1;
             };
 
-            struct Varying
+            struct v2f
             {
                 float4 pos : SV_POSITION;//pos是经过裁剪空间处理过后的顶点齐次坐标（必须要写）
                 float2 mainUV : TEXCOORD0;
@@ -62,9 +62,9 @@ Shader "MyCustom/StandardPBR"
             half NormalStrength;
             half Smoothness;
             
-            Varying vert (Attributes v)
+            v2f vert (appdata v)
             {
-                Varying o;
+                v2f o;
                 o.pos = TransformObjectToHClip(v.vertex);
                 o.mainUV = TRANSFORM_TEX(v.mainUV, BaseMap);
                 o.normalUV = TRANSFORM_TEX(v.normalUV,NormalMap);
@@ -161,7 +161,7 @@ Shader "MyCustom/StandardPBR"
                 return diffuse + specular;
             }
             
-            half4 frag (Varying i) : SV_Target
+            half4 frag (v2f i) : SV_Target
             {
                 half4 col;
                 half4 albedo = SAMPLE_TEXTURE2D(BaseMap,sampler_BaseMap,i.mainUV);
